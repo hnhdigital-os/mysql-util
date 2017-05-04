@@ -1,5 +1,5 @@
 #!/bin/bash
-# clone_db.sh: Clone a database into another database.
+# clone-db: Clone a database into another database.
 
 echo ""
 echo "Processing '$0 $1 $2 $3'"
