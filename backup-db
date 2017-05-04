@@ -1,0 +1,60 @@
+#!/bin/bash
+# backup-db: Backup a database.
+
+echo ""
+echo "Processing '$0'"
+echo ""
+
+if [ "$(whoami)" != 'root' ]; then
+    echo "You need to use '[root]# $0' or 'sudo $0' to run this script.";
+    exit 1;
+fi
+
+. db.conf
+
+if [ -z "$1" ]; then
+  echo "pull_db.sh [source]";
+  echo "";
+  echo -e "\tsource\t\t- The source database (from list)";
+  echo "";
+  echo -e "\tAvailable databases:";
+  
+  for i in ${AVAILABLE_DB[@]}; do
+    echo -e "\t- ${i}";
+  done
+  echo "";
+  exit 1;
+fi
+
+SOURCE_DB=$1
+SOURCE_CONFIG="db_$1"
+
+if [ -z $(eval "echo \${$SOURCE_CONFIG[HOST]}") ]; then
+    echo "The name '$1' specified as the source database has no configuration.";
+    echo "";
+    exit 1;
+fi
+
+SOURCE_HOST=$(eval "echo \${$SOURCE_CONFIG[HOST]}")
+SOURCE_DATABASE=$(eval "echo \${$SOURCE_CONFIG[DATABASE]}")
+SOURCE_USERNAME=$(eval "echo \${$SOURCE_CONFIG[USERNAME]}")
+SOURCE_PASSWORD=$(eval "echo \${$SOURCE_CONFIG[PASSWORD]}")
+
+MYSQL_CMD="mysql -h $SOURCE_HOST -u $SOURCE_USERNAME --password=\"$SOURCE_PASSWORD\" -e \";\""
+
+if [ ! $MYSQL_CMD 2>/dev/null ]; then
+    echo "Incorrect MySQL login details for '$SOURCE_DB' - '$SOURCE_HOST'"
+    echo ""
+    exit 1;
+fi
+
+# Backup destination
+mkdir -p "./backups/saved"
+mysqldump -h $DESTINATION_HOST -p --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --add-drop-table --add-drop-database --databases $DESTINATION_DATABASE > backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
+# Remove definer that can not be used in RDS
+perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql > ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
+unlink ./backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
+zip ./backups/saved/${DESTINATION_DATABASE}_$DATE.zip ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
+unlink ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
+
+echo "./backups/saved/${DESTINATION_DATABASE}_$DATE.zip"
