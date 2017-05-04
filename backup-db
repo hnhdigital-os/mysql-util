@@ -10,7 +10,7 @@ if [ "$(whoami)" == 'root' ]; then
     exit 1;
 fi
 
-. db.conf
+. ./db.conf
 
 if [ -z "$1" ]; then
   echo "pull_db.sh [source]";
