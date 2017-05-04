@@ -48,6 +48,8 @@ if [ ! $MYSQL_CMD 2>/dev/null ]; then
     exit 1;
 fi
 
+DATE=`date +%Y%m%d_%H%M%S`
+
 # Backup destination
 mkdir -p "./backups/saved"
 mysqldump -h $DESTINATION_HOST -p --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --add-drop-table --add-drop-database --databases $DESTINATION_DATABASE > backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
