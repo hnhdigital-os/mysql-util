@@ -48,9 +48,9 @@ DATE=`date +%Y%m%d_%H%M%S`
 
 # Backup destination
 mkdir -p "./backups/saved"
-mysqldump -h $DESTINATION_HOST -p --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --add-drop-table --add-drop-database --databases $SOURCE_DATABASE > backups/saved/TEMP_${SOURCE_DATABASE}_$DATE.sql > /dev/null 2>&1
-# Remove definer that can not be used in RDS
-perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${SOURCE_DATABASE}_$DATE.sql > ./backups/saved/${SOURCE_DATABASE}_$DATE.sql
+mysqldump -h $SOURCE_HOST -p --user=$SOURCE_USERNAME --password=$SOURCE_PASSWORD --add-drop-table $1 > ./backups/saved/TEMP_${SOURCE_DATABASE}_$DATE.sql
+perl -pe 's/\sDEFINER=`[^`]+`@`[^`]$DESTINATION_PASSWORD --add-drop-table --add-drop-database --databases $SOURCE_DATABASE > ./backups/saved/TEMP_${SOURCE_DATABASE}_$DATE.sql
++`//' < ./backups/saved/TEMP_${SOURCE_DATABASE}_$DATE.sql > ./backups/saved/${SOURCE_DATABASE}_$DATE.sql
 unlink ./backups/saved/TEMP_${SOURCE_DATABASE}_$DATE.sql > /dev/null 2>&1
 
 echo "./backups/saved/${SOURCE_DATABASE}_$DATE.sql"
