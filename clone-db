@@ -98,7 +98,7 @@ if [[ $response =~ ^(yes|y)$ ]]; then
         # Backup destination
         mkdir -p "./backups/saved"
         chown -R ubuntu:ubuntu "./backups" 
-        mysqldump -h $DESTINATION_HOST -p --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --single-tansaction --add-drop-table --add-drop-database --databases $DESTINATION_DATABASE > backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
+        mysqldump -CceKq -h $DESTINATION_HOST -p --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --single-tansaction --add-drop-table --add-drop-database --databases $DESTINATION_DATABASE > backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
         # Remove definer that can not be used in RDS
         perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql > ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
         unlink ./backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
@@ -109,7 +109,7 @@ if [[ $response =~ ^(yes|y)$ ]]; then
     mkdir -p "./backups/current"
 
     # Pull the source down
-    mysqldump -h $SOURCE_HOST -p --user=$SOURCE_USERNAME --password=$SOURCE_PASSWORD --single-tansaction --add-drop-table $SOURCE_DATABASE > backups/current/TEMP_$SOURCE_DATABASE.sql
+    mysqldump -CceKq -h $SOURCE_HOST -p --user=$SOURCE_USERNAME --password=$SOURCE_PASSWORD --single-tansaction --add-drop-table $SOURCE_DATABASE > backups/current/TEMP_$SOURCE_DATABASE.sql
 
     # Remove definer that can not be used in RDS
     perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DATABASE.sql > ./backups/current/$SOURCE_DATABASE.sql
