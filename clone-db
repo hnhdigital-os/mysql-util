@@ -19,16 +19,10 @@ if [ -z "$1" ] || [ -z "$2" ]; then
   echo -e "\tdestination\t- The destination database (from list)";
   echo -e "\tno backup\t- optionally set this to 1 to not backup the destination database";
   echo "";
-  echo -e "\tAvailable databases:";
-  
-  for i in ${AVAILABLE_DB[@]}; do
-    echo -e "\t- ${i}";
-  done
-  echo "";
   exit 1;
 fi
 
-if [ "$2" == 'production' ]; then 
+if [ "$2" == *"production"* ]; then 
     echo "You can not clone to production from any database."; 
     echo "";
     exit 1;

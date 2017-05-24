@@ -13,12 +13,6 @@ if [ -z "$1" ]; then
   echo "";
   echo -e "\tsource\t\t- The source database (from list)";
   echo "";
-  echo -e "\tAvailable databases:";
-  
-  for i in ${AVAILABLE_DB[@]}; do
-    echo -e "\t- ${i}";
-  done
-  echo "";
   exit 1;
 fi
 
