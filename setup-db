@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo -n "Enter the database: "
+read DB
+echo -n "Enter the host: "
+read HOST
+echo -n "Enter the user: "
+read USER
+
+mysql_config_editor set --login-path=$DB --host=$HOST --user=$USER --password
+

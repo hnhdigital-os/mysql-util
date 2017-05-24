@@ -13,7 +13,7 @@ fi
 . db.conf
 
 if [ -z "$1" ] || [ -z "$2" ]; then
-  echo "pull_db.sh [source] [destination] [no backup]";
+  echo "clone-db [source] [destination] [no backup]";
   echo "";
   echo -e "\tsource\t\t- The source database (from list)";
   echo -e "\tdestination\t- The destination database (from list)";
@@ -35,44 +35,20 @@ if [ "$2" == 'production' ]; then
 fi
 
 SOURCE_DB=$1
-SOURCE_CONFIG="db_$1"
 DESTINATION_DB=$2
-DESTINATION_CONFIG="db_$2"
 
-if [ -z $(eval "echo \${$SOURCE_CONFIG[HOST]}") ]; then
-    echo "The name '$1' specified as the source database has no configuration.";
-    echo "";
-    exit 1;
-fi
-
-if [ -z $(eval "echo \${$DESTINATION_CONFIG[HOST]}") ]; then
-    echo "The name '$2' specified as the destination database has no configuration.";
-    echo "";
-    exit 1;
-fi
-
-SOURCE_HOST=$(eval "echo \${$SOURCE_CONFIG[HOST]}")
-SOURCE_DATABASE=$(eval "echo \${$SOURCE_CONFIG[DATABASE]}")
-SOURCE_USERNAME=$(eval "echo \${$SOURCE_CONFIG[USERNAME]}")
-SOURCE_PASSWORD=$(eval "echo \${$SOURCE_CONFIG[PASSWORD]}")
-
-DESTINATION_HOST=$(eval "echo \${$DESTINATION_CONFIG[HOST]}")
-DESTINATION_DATABASE=$(eval "echo \${$DESTINATION_CONFIG[DATABASE]}")
-DESTINATION_USERNAME=$(eval "echo \${$DESTINATION_CONFIG[USERNAME]}")
-DESTINATION_PASSWORD=$(eval "echo \${$DESTINATION_CONFIG[PASSWORD]}")
-
-MYSQL_CMD="mysql -h $SOURCE_HOST -u $SOURCE_USERNAME --password=\"$SOURCE_PASSWORD\" -e \";\""
+MYSQL_CMD="mysql --login-path=$SOURCE_DB -e \";\""
 
 if [ ! $MYSQL_CMD 2>/dev/null ]; then
-    echo "Incorrect MySQL login details for '$SOURCE_DB' - '$SOURCE_HOST'"
+    echo "Incorrect MySQL login details for '$SOURCE_DB'"
     echo ""
     exit 1;
 fi
 
-MYSQL_CMD="mysql -h $DESTINATION_HOST -u $DESTINATION_USERNAME --password=\"$DESTINATION_PASSWORD\" -e \";\""
+MYSQL_CMD="mysql --login-path=$DESTINATION_DB -e \";\""
 
 if [ ! $MYSQL_CMD 2>/dev/null ]; then
-    echo "Incorrect MySQL login details for '$DESTINATION_DB' - '$DESTINATION_HOST'"
+    echo "Incorrect MySQL login details for '$DESTINATION_DB'"
     echo ""
     exit 1;
 fi
@@ -80,12 +56,12 @@ fi
 DATE=`date +%Y%m%d_%H%M%S`
 
 echo "";
-echo "This will clone all data from '$SOURCE_DATABASE' into '$DESTINATION_DATABASE'";
+echo "This will clone all data from '$SOURCE_DB' into '$DESTINATION_DB'";
 echo "";
 if [ "$3" ]; then
-    echo "WARNING: '$DESTINATION_DB' - '$DESTINATION_DATABASE' will not be backed up!"
+    echo "WARNING: '$DESTINATION_DB' will not be backed up!"
 else
-    echo "NOTE: '$DESTINATION_DB' - '$DESTINATION_DATABASE' will be backed up to 'backups/saved/${DESTINATION_DATABASE}_$DATE.sql'"
+    echo "NOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'"
 fi
 echo "";
 read -r -p "Do you want to continue? [y/N] " response
@@ -98,30 +74,30 @@ if [[ $response =~ ^(yes|y)$ ]]; then
         # Backup destination
         mkdir -p "./backups/saved"
         chown -R ubuntu:ubuntu "./backups" 
-        mysqldump -CceKq -h $DESTINATION_HOST -p --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DATABASE > backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
+        mysqldump -CceKq --login-path=$DESTINATION_DB --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
         # Remove definer that can not be used in RDS
-        perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql > ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
-        unlink ./backups/saved/TEMP_${DESTINATION_DATABASE}_$DATE.sql
-        zip ./backups/saved/${DESTINATION_DATABASE}_$DATE.zip ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
-        unlink ./backups/saved/${DESTINATION_DATABASE}_$DATE.sql
+        perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
+        unlink ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+        zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
+        unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql
     fi
 
     mkdir -p "./backups/current"
 
     # Pull the source down
-    mysqldump -CceKq -h $SOURCE_HOST -p --user=$SOURCE_USERNAME --password=$SOURCE_PASSWORD --single-transaction --add-drop-table $SOURCE_DATABASE > backups/current/TEMP_$SOURCE_DATABASE.sql
+    mysqldump -CceKq --login-path=$SOURCE_DB --single-transaction --add-drop-table $SOURCE_DB > backups/current/TEMP_$SOURCE_DB.sql
 
     # Remove definer that can not be used in RDS
-    perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DATABASE.sql > ./backups/current/$SOURCE_DATABASE.sql
-    unlink ./backups/current/TEMP_$SOURCE_DATABASE.sql
+    perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
+    unlink ./backups/current/TEMP_$SOURCE_DB.sql
 
     # Push the source onto the destination
-    mysql -h $DESTINATION_HOST --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD -e "DROP DATABASE IF EXISTS ${DESTINATION_DATABASE}"
-    mysql -h $DESTINATION_HOST --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD -e "CREATE DATABASE ${DESTINATION_DATABASE} DEFAULT CHARACTER SET utf8mb4"
-    mysql -h $DESTINATION_HOST --user=$DESTINATION_USERNAME --password=$DESTINATION_PASSWORD --database=$DESTINATION_DATABASE < backups/current/$SOURCE_DATABASE.sql
+    mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
+    mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
+    mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < backups/current/$SOURCE_DB.sql
 
     # Remove final restore file that we have used
-    unlink ./backups/current/$SOURCE_DATABASE.sql
+    unlink ./backups/current/$SOURCE_DB.sql
         
 fi
 
