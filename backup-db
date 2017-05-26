@@ -1,6 +1,13 @@
 #!/bin/bash
 # backup-db: Backup a database.
 
+if [[ ! -z "${BASH_SOURCE%/*}/db.conf" ]]; then
+    echo "Configuration file missing. We just copied the example for you."
+    echo "Edit the db.conf file and re-run script."
+    cp "${BASH_SOURCE%/*}/db.conf.example" "${BASH_SOURCE%/*}/db.conf"
+  exit 1;
+fi
+
 . "${BASH_SOURCE%/*}/db.conf"
 
 if [ -z "$1" ]; then

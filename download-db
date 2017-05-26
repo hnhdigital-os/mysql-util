@@ -1,11 +1,14 @@
 #!/bin/bash
 # download_db.sh: Download and import a database.
 
-echo ""
-echo "Processing '$0 $1 $2 $3'"
-echo ""
+if [[ ! -z "${BASH_SOURCE%/*}/db.conf" ]]; then
+    echo "Configuration file missing. We just copied the example for you."
+    echo "Edit the db.conf file and re-run script."
+    cp "${BASH_SOURCE%/*}/db.conf.example" "${BASH_SOURCE%/*}/db.conf"
+  exit 1;
+fi
 
-. db.conf
+. "${BASH_SOURCE%/*}/db.conf"
 
 if [ -z "$1" ] || [ -z "$2" ]; then
   echo "download_db.sh [source] [destination] [no backup]";
