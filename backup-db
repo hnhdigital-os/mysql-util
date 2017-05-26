@@ -1,11 +1,6 @@
 #!/bin/bash
 # backup-db: Backup a database.
 
-if [ "$(whoami)" == 'root' ]; then
-    echo "You need to run as a local user for this script.";
-    exit 1;
-fi
-
 . "${BASH_SOURCE%/*}/db.conf"
 
 if [ -z "$1" ]; then

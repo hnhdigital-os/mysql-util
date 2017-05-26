@@ -5,11 +5,6 @@ echo ""
 echo "Processing '$0 $1 $2 $3'"
 echo ""
 
-if [ "$(whoami)" == 'root' ]; then
-    echo "You need to run as a local user for this script.";
-    exit 1;
-fi
-
 . db.conf
 
 if [ -z "$1" ] || [ -z "$2" ]; then
