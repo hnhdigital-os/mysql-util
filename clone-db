@@ -1,6 +1,10 @@
 #!/bin/bash
 # clone-db: Clone a database into another database.
 
+command -v mysql >/dev/null 2>&1 || { echo "I require mysql but it's not installed.  Aborting." >&2; exit 1; }
+command -v mysqldump >/dev/null 2>&1 || { echo "I require mysqldump but it's not installed.  Aborting." >&2; exit 1; }
+command -v zip >/dev/null 2>&1 || { echo "I require zip but it's not installed.  Aborting." >&2; exit 1; }
+
 if [[ ! -e "${BASH_SOURCE%/*}/db.conf" ]]; then
     echo "Configuration file missing. We just copied the example for you."
     echo "Edit the db.conf file and re-run script."
