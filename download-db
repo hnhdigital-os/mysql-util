@@ -1,0 +1,104 @@
+#!/bin/bash
+# download_db.sh: Download and import a database.
+
+echo ""
+echo "Processing '$0 $1 $2 $3'"
+echo ""
+
+if [ "$(whoami)" == 'root' ]; then
+    echo "You need to run as a local user for this script.";
+    exit 1;
+fi
+
+. db.conf
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "download_db.sh [source] [destination] [no backup]";
+  echo "";
+  echo -e "\tsource\t\t- The source database (from list)";
+  echo -e "\tdestination\t- The destination database (from list)";
+  echo -e "\tno backup\t- optionally set this to 1 to not backup the destination database";
+  echo "";
+  echo -e "\tAvailable databases:";
+  
+  for i in ${AVAILABLE_DB[@]}; do
+    echo -e "\t- ${i}";
+  done
+  echo "";
+  exit 1;
+fi
+
+SOURCE_DB=$1
+SOURCE_CONFIG="remote_$1"
+DESTINATION_DB=$2
+
+if [ -z $(eval "echo \${$SOURCE_CONFIG[HOST]}") ]; then
+    echo "The name '$1' specified as the source database has no configuration.";
+    echo "";
+    exit 1;
+fi
+
+SOURCE_HOST=$(eval "echo \${$SOURCE_CONFIG[HOST]}")
+SOURCE_DATABASE=$(eval "echo \${$SOURCE_CONFIG[DB]}")
+
+MYSQL_CMD="mysql --login-path=$DESTINATION_DB -e \";\""
+
+if [ ! $MYSQL_CMD 2>/dev/null ]; then
+    echo "Incorrect MySQL login details for '$DESTINATION_DB' - '$DESTINATION_HOST'"
+    echo ""
+    exit 1;
+fi
+
+DATE=`date +%Y%m%d_%H%M%S`
+
+echo "This will clone all data from '$SOURCE_HOST/$SOURCE_DATABASE' into '$DESTINATION_DB'";
+echo "";
+if [ "$3" ]; then
+    echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
+else
+    echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
+fi
+echo "";
+read -r -p "Do you want to continue? [y/N] " response
+response=${response,,}    # tolower
+
+if [[ $response =~ ^(yes|y)$ ]]; then
+
+    # pull the database configuration
+
+    if [ -z "$3" ]; then
+        # Backup destination
+        mkdir -p "./backups/saved"
+        echo -e "\e[32mStarting backup of $DESTINATION_DB...\e[0m"
+        mysqldump --login-path=$DESTINATION_DB --add-drop-table $DESTINATION_DB > ./backups/saved/${DESTINATION_DB}_$DATE.sql
+        echo -e "\e[32mBackup up of $DESTINATION_DB has completed.\e[0m"
+        zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
+        unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql > /dev/null 2>&1
+    fi
+
+    echo -e "\e[32mRunning remote backup $SOURCE_HOST/$SOURCE_DATABASE...\e[0m"
+    backup_path=$(ssh $SOURCE_HOST '/srv/util/backup-db' $SOURCE_DATABASE)
+    echo -e "\e[32mBackup up of $SOURCE_HOST/$SOURCE_DATABASE has completed.\e[0m"
+
+
+    if [[ ! -z "${backup_path// }" ]]; then
+        echo -e "\e[32mDownloading $SOURCE_DATABASE...\e[0m"
+        mkdir -p "./backups/latest"
+        scp -C -r $SOURCE_HOST:$backup_path ./backups/latest/$1.sql > /dev/null 2>&1
+        SOURCE_SQL="./backups/latest/$1.sql"
+
+        # Push the source onto the destination
+        echo -e "\e[32mRestoring backup $SOURCE_DATABASE into $DESTINATION_DB\e[0m"
+        mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
+        mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
+        mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < $SOURCE_SQL
+
+        # Remove final restore file that we have used
+        unlink $SOURCE_SQL
+        ssh $SOURCE_HOST unlink $backup_path
+        echo -e "\e[32mDone.\e[0m"
+    fi
+
+fi
+
+exit 0;
