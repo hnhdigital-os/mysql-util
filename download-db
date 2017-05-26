@@ -1,7 +1,7 @@
 #!/bin/bash
 # download_db.sh: Download and import a database.
 
-if [[ ! -z "${BASH_SOURCE%/*}/db.conf" ]]; then
+if [[ ! -e "${BASH_SOURCE%/*}/db.conf" ]]; then
     echo "Configuration file missing. We just copied the example for you."
     echo "Edit the db.conf file and re-run script."
     cp "${BASH_SOURCE%/*}/db.conf.example" "${BASH_SOURCE%/*}/db.conf"
