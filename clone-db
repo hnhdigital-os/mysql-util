@@ -70,7 +70,7 @@ if [[ $response =~ ^(yes|y)$ ]]; then
         # Backup destination
         mkdir -p "./backups/saved"
         chown -R ubuntu:ubuntu "./backups" 
-        mysqldump -CceKq --login-path=$DESTINATION_DB --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+        mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
         # Remove definer that can not be used in RDS
         perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
         unlink ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
@@ -81,7 +81,7 @@ if [[ $response =~ ^(yes|y)$ ]]; then
     mkdir -p "./backups/current"
 
     # Pull the source down
-    mysqldump -CceKq --login-path=$SOURCE_DB --single-transaction --add-drop-table $SOURCE_DB > backups/current/TEMP_$SOURCE_DB.sql
+    mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --add-drop-table $SOURCE_DB > backups/current/TEMP_$SOURCE_DB.sql
 
     # Remove definer that can not be used in RDS
     perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
