@@ -1,0 +1,115 @@
+#!/bin/bash
+# restore-db: Download and import a database.
+
+command -v mysql >/dev/null 2>&1 || { echo "I require mysql but it's not installed.  Aborting." >&2; exit 1; }
+command -v mysqldump >/dev/null 2>&1 || { echo "I require mysqldump but it's not installed.  Aborting." >&2; exit 1; }
+command -v zip >/dev/null 2>&1 || { echo "I require zip but it's not installed.  Aborting." >&2; exit 1; }
+
+BASH_DIR="$( cd "$( dirname "$0" )" && pwd )"
+
+if [[ ! -f "$BASH_DIR/db.conf" ]]; then
+    echo "Configuration file missing. We just copied the example for you."
+    echo "Edit the db.conf file and re-run script."
+    cp "$BASH_DIR/db.conf.example" "$BASH_DIR/db.conf"
+  exit 1;
+fi
+
+. "$BASH_DIR/db.conf"
+
+if [ -z "$1" ]; then
+  echo "restore-db [destination] [no backup]";
+  echo "";
+  echo -e "\tdestination\t- The destination database (from list)";
+  echo -e "\tno backup\t- optionally set this to 1 to not backup the destination database";
+  echo "";
+  echo -e "\tAvailable destination databases:";
+  mysql_config_editor print --all
+  echo "";
+  exit 1;
+fi
+
+BACKUP_DB_OPTION=""
+DESTINATION_DB="$1"
+
+MYSQL_CMD="mysql --login-path=$DESTINATION_DB -e \";\""
+
+if [ ! $MYSQL_CMD 2>/dev/null ]; then
+  echo "Incorrect MySQL login details for '$DESTINATION_DB' - '$DESTINATION_HOST'"
+  echo ""
+  exit 1;
+fi
+
+if [ -z "$2" ]; then
+  echo "";
+  read -r -p "Do you want to backup existing data? [Y/n] " response
+  response=${response,,}
+
+  if [[ $BACKUP_DB_OPTION =~ ^(no|n)$ ]]; then
+    BACKUP_DB_OPTION="no"
+  else
+    BACKUP_DB_OPTION="$response"
+  fi
+fi
+
+DATE=`date +%Y%m%d_%H%M%S`
+
+for file in "$BASH_DIR/backups/saved"/*; do
+  filename=$(basename "$file")
+  filename="${filename%.*}"
+  if [ -f "$file" ]; then
+    echo "$filename"
+  fi
+done
+
+while [ -z "$BACKUP_PATH" ]; do
+  echo "";
+  read -r -p "Please specify a database to restore: " response
+  response=${response,,}
+  BACKUP_PATH="$response"
+
+  if [ ! -f "$BASH_DIR/backups/saved/$BACKUP_PATH.zip" ]; then
+    BACKUP_PATH=""
+  fi
+done
+
+BACKUP_PATH_NAME="$BACKUP_PATH"
+BACKUP_PATH="$BASH_DIR/backups/saved/$BACKUP_PATH.zip"
+
+echo "This will clone all data from '$BACKUP_PATH_NAME' into '$DESTINATION_DB'";
+echo "";
+if [[ $BACKUP_DB_OPTION =~ ^(no|n)$ ]]; then
+  echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
+else
+  echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
+fi
+echo "";
+read -r -p "Do you want to continue? [y/N] " response
+response=${response,,}    # tolower
+
+if [[ $response =~ ^(yes|y)$ ]]; then  
+
+  if [[ $BACKUP_DB_OPTION =~ ^(yes|y)$ ]]; then
+    mkdir -p "$BASH_DIR/backups/saved"
+    echo -e "\e[32mStarting backup of $DESTINATION_DB...\e[0m"
+    mysqldump --login-path=$DESTINATION_DB --add-drop-table $DESTINATION_DB > ./backups/saved/${DESTINATION_DB}_$DATE.sql
+    echo -e "\e[32mBackup up of $DESTINATION_DB has completed.\e[0m"
+    zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
+    unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql > /dev/null 2>&1
+  fi
+     
+  if [[ -f "$BACKUP_PATH" ]]; then
+    unzip "$BACKUP_PATH"
+    SOURCE_SQL="$BASH_DIR/backups/saved/$BACKUP_PATH_NAME.sql"
+
+    # Push the source onto the destination
+    echo -e "\e[32mRestoring backup $BACKUP_PATH_NAME into $DESTINATION_DB\e[0m"
+    mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
+    mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
+    mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < $SOURCE_SQL
+
+    # Remove final restore file that we have used
+    unlink "$SOURCE_SQL"
+    echo -e "\e[32mDone.\e[0m"
+  fi
+
+fi
