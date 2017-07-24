@@ -1,5 +1,5 @@
 #!/bin/bash
-# download_db.sh: Download and import a database.
+# download-db: Download and import a database.
 
 command -v mysql >/dev/null 2>&1 || { echo "I require mysql but it's not installed.  Aborting." >&2; exit 1; }
 command -v mysqldump >/dev/null 2>&1 || { echo "I require mysqldump but it's not installed.  Aborting." >&2; exit 1; }
@@ -15,17 +15,21 @@ fi
 . "${BASH_SOURCE%/*}/db.conf"
 
 if [ -z "$1" ] || [ -z "$2" ]; then
-  echo "download_db.sh [source] [destination] [no backup]";
+  echo "download-db [source] [destination] [no backup]";
   echo "";
   echo -e "\tsource\t\t- The source database (from list)";
   echo -e "\tdestination\t- The destination database (from list)";
   echo -e "\tno backup\t- optionally set this to 1 to not backup the destination database";
   echo "";
-  echo -e "\tAvailable databases:";
+  echo -e "\tAvailable remote databases:";
   
   for i in ${AVAILABLE_DB[@]}; do
     echo -e "\t- ${i}";
   done
+  echo "";
+  echo -e "\tAvailable destination databases:";
+  
+  mysql_config_editor print --all
   echo "";
   exit 1;
 fi
