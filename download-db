@@ -76,10 +76,11 @@ if [[ $response =~ ^(yes|y)$ ]]; then
         # Backup destination
         mkdir -p "./backups/saved"
         echo -e "\e[32mStarting backup of $DESTINATION_DB...\e[0m"
-        mysqldump --login-path=$DESTINATION_DB --add-drop-table $DESTINATION_DB > ./backups/saved/${DESTINATION_DB}_$DATE.sql
+        EXPECTED_SIZE=$(mysql --login-path=$DESTINATION_DB -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${DESTINATION_DB}\";")
+        mysqldump --login-path=${DESTINATION_DB} --add-drop-table ${DESTINATION_DB} | pv --progress --size "${EXPECTED_SIZE}m" > "./backups/saved/${DESTINATION_DB}_$DATE.sql"
         echo -e "\e[32mBackup up of $DESTINATION_DB has completed.\e[0m"
-        zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
-        unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql > /dev/null 2>&1
+        zip "./backups/saved/${DESTINATION_DB}_$DATE.sql.zip" "./backups/saved/${DESTINATION_DB}_$DATE.sql"
+        unlink "./backups/saved/${DESTINATION_DB}_$DATE.sql" > /dev/null 2>&1
     fi
 
     echo -e "\e[32mRunning remote backup $SOURCE_HOST/$SOURCE_DATABASE...\e[0m"
