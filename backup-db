@@ -34,7 +34,7 @@ fi
 
 DATE=`date +%Y%m%d_%H%M%S`
 
-EXPECTED_SIZE=$(mysql --login-path=${SOURCE_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${SOURCE_DB}\";")
+EXPECTED_SIZE=$(mysql --login-path=${SOURCE_DB} -N -e "SELECT FLOOR(SUM(data_length + index_length) / 1024 / 1024, 2) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${SOURCE_DB}\";")
 
 if [ $EXPECTED_SIZE == "NULL" ]; then
   echo "No data to backup!"
