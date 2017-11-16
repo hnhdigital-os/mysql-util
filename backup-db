@@ -34,16 +34,9 @@ fi
 
 DATE=`date +%Y%m%d_%H%M%S`
 
-EXPECTED_SIZE=$(mysql --login-path=${SOURCE_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${SOURCE_DB}\";")
-
-if [ $EXPECTED_SIZE == "NULL" ]; then
-  echo "No data to backup!"
-  exit 1
-fi
-
 # Backup destination
 mkdir -p "./backups/saved"
-mysqldump --login-path=$SOURCE_DB --add-drop-table $SOURCE_DB | pv --progress --size "${EXPECTED_SIZE}m" > "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql"
+mysqldump --login-path=$SOURCE_DB --add-drop-table $SOURCE_DB > "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql"
 perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql" > "./backups/saved/${SOURCE_DB}_$DATE.sql"
 unlink "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql" > /dev/null 2>&1
 
