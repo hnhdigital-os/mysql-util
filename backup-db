@@ -40,7 +40,7 @@ mysqldump --login-path=$SOURCE_DB --add-drop-table $SOURCE_DB > "./backups/saved
 perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql" > "./backups/saved/${SOURCE_DB}_$DATE.sql"
 unlink "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql" > /dev/null 2>&1
 
-zip "./backups/saved/${SOURCE_DB}_$DATE.sql.zip" "./backups/saved/${SOURCE_DB}_$DATE.sql"
+zip -qq "./backups/saved/${SOURCE_DB}_$DATE.sql.zip" "./backups/saved/${SOURCE_DB}_$DATE.sql"
 
 unlink "./backups/saved/${SOURCE_DB}_$DATE.sql" > /dev/null 2>&1
 
