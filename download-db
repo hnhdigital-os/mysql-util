@@ -79,31 +79,40 @@ if [[ $response =~ ^(yes|y)$ ]]; then
         EXPECTED_SIZE=$(mysql --login-path=$DESTINATION_DB -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${DESTINATION_DB}\";")
         mysqldump --login-path=${DESTINATION_DB} --add-drop-table ${DESTINATION_DB} | pv --progress --size "${EXPECTED_SIZE}m" > "./backups/saved/${DESTINATION_DB}_$DATE.sql"
         echo -e "\e[32mBackup up of $DESTINATION_DB has completed.\e[0m"
-        zip "./backups/saved/${DESTINATION_DB}_$DATE.sql.zip" "./backups/saved/${DESTINATION_DB}_$DATE.sql"
+        zip -qq "./backups/saved/${DESTINATION_DB}_$DATE.sql.zip" "./backups/saved/${DESTINATION_DB}_$DATE.sql"
         unlink "./backups/saved/${DESTINATION_DB}_$DATE.sql" > /dev/null 2>&1
     fi
 
     echo -e "\e[32mRunning remote backup $SOURCE_HOST/$SOURCE_DATABASE...\e[0m"
-    backup_path=$(ssh $SOURCE_HOST '/srv/util/backup-db' $SOURCE_DATABASE)
+    backup_path=$(ssh $SOURCE_HOST '/srv/mysql-util/backup-db' $SOURCE_DATABASE)
     echo -e "\e[32mBackup up of $SOURCE_HOST/$SOURCE_DATABASE has completed.\e[0m"
 
 
     if [[ ! -z "${backup_path// }" ]]; then
         echo -e "\e[32mDownloading $SOURCE_DATABASE...\e[0m"
         mkdir -p "./backups/latest"
-        scp -C -r $SOURCE_HOST:$backup_path ./backups/latest/$1.sql > /dev/null 2>&1
+        REMOTE_FILE_SIZE=ssh $SOURCE_HOST stat --printf="%s" $backup_path
+        rsync -r -v --progress $SOURCE_HOST:$backup_path ./backups/latest/$1.sql.zip
+        LOCAL_FILE_SIZE=$(stat --printf="%s" ./backups/latest/$1.sql.zip)
+        SOURCE_SQL_ZIPPED="./backups/latest/$1.sql.zip"
         SOURCE_SQL="./backups/latest/$1.sql"
 
         # Push the source onto the destination
-        echo -e "\e[32mRestoring backup $SOURCE_DATABASE into $DESTINATION_DB\e[0m"
-        mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
-        mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
-        mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < $SOURCE_SQL
+        if [ $REMOTE_FILE_SIZE == $LOCAL_FILE_SIZE ]; then
+          unzip -qq -o $SOURCE_SQL_ZIPPED
+          echo -e "\e[32mRestoring backup $SOURCE_DATABASE into $DESTINATION_DB\e[0m"
+          mysql --login-path=${DESTINATION_DB} -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
+          mysql --login-path=${DESTINATION_DB} -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
+          pv $SOURCE_SQL | mysql --login-path=${DESTINATION_DB} --database=${DESTINATION_DB}
 
-        # Remove final restore file that we have used
-        unlink $SOURCE_SQL
-        ssh $SOURCE_HOST unlink $backup_path
-        echo -e "\e[32mDone.\e[0m"
+          # Remove final restore file that we have used
+          unlink $SOURCE_SQL_ZIPPED
+          unlink $SOURCE_SQL
+          ssh $SOURCE_HOST unlink $backup_path
+          echo -e "\e[32mDone.\e[0m"
+        else
+          echo -e "\e[32mFailed.\e[0m"
+        fi
     fi
 
 fi
