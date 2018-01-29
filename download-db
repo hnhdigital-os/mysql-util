@@ -1,6 +1,8 @@
 #!/bin/bash
 # download-db: Download and import a database.
 
+trap "exit" INT
+
 command -v mysql >/dev/null 2>&1 || { echo "I require mysql but it's not installed.  Aborting." >&2; exit 1; }
 command -v mysqldump >/dev/null 2>&1 || { echo "I require mysqldump but it's not installed.  Aborting." >&2; exit 1; }
 command -v zip >/dev/null 2>&1 || { echo "I require zip but it's not installed.  Aborting." >&2; exit 1; }
@@ -47,6 +49,7 @@ fi
 
 SOURCE_HOST=$(eval "echo \${$SOURCE_CONFIG[HOST]}")
 SOURCE_DATABASE=$(eval "echo \${$SOURCE_CONFIG[DB]}")
+BACKUP_BIN_PATH=$(eval "echo \${$SOURCE_CONFIG[BIN_PATH]}")
 
 MYSQL_CMD="mysql --login-path=$DESTINATION_DB -e \";\""
 
@@ -72,19 +75,25 @@ else
   echo -e "\e[32mNo local backup of\e[0m $DESTINATION_DB \e[32mdue to no data.\e[0m"
 fi
 
-if [ "$IGNORE_BACKUP" ]; then
-    echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
-else
-    echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
-fi
-echo "";
+if [ -z "$IGNORE_BACKUP" ]; then
+  read -r -p "Do you want to backup local database? [\e[45mY\e[0m/n] " response
 
-read -r -p "Do you want to continue? [y/N] " response
+  if [[ ! $response =~ ^(yes|y)$ ]]; then
+    echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
+  else
+    echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
+    IGNORE_BACKUP=1
+  fi
+
+  echo "";
+fi
+
+read -r -p "Do you want to continue? [\e[45mY\e[0m/n] " response
 echo "";
 
 response=${response,,}    # tolower
 
-if [[ $response =~ ^(yes|y)$ ]]; then
+if [[ ! $response =~ ^(yes|y)$ ]]; then
 
     # pull the database configuration
 
@@ -99,7 +108,7 @@ if [[ $response =~ ^(yes|y)$ ]]; then
     fi
 
     echo -e "\e[32mStarting remote backup of\e[0m $SOURCE_DATABASE"
-    REMOTE_SQL_ZIP=$(ssh $SOURCE_HOST '/srv/mysql-util/backup-db' $SOURCE_DATABASE)
+    REMOTE_SQL_ZIP=$(ssh ${SOURCE_HOST} ${BACKUP_BIN_PATH} ${SOURCE_DATABASE})
 
     if [[ ! -z "${REMOTE_SQL_ZIP// }" ]]; then
       echo -e "\e[32mDownloading\e[0m $REMOTE_SQL_ZIP"
