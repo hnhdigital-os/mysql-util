@@ -1,0 +1,4 @@
+#!/bin/bash
+# install: Install required packages
+
+sudo apt-get install zip pv -y
