@@ -1,11 +1,18 @@
 #!/bin/bash
 # download-db: Download and import a database.
 
-trap "exit" INT
+cleanup() {
+    echo "";
+    echo "";
+    exit
+}
+
+trap cleanup INT TERM
 
 command -v mysql >/dev/null 2>&1 || { echo "I require mysql but it's not installed.  Aborting." >&2; exit 1; }
 command -v mysqldump >/dev/null 2>&1 || { echo "I require mysqldump but it's not installed.  Aborting." >&2; exit 1; }
 command -v zip >/dev/null 2>&1 || { echo "I require zip but it's not installed.  Aborting." >&2; exit 1; }
+command -v pv >/dev/null 2>&1 || { echo "I require pv but it's not installed.  Aborting." >&2; exit 1; }
 
 if [[ ! -e "${BASH_SOURCE%/*}/db.conf" ]]; then
     echo "Configuration file missing. We just copied the example for you."
@@ -71,21 +78,23 @@ EXPECTED_SIZE=$(mysql --login-path=${DESTINATION_DB} -N -e "SELECT ROUND(SUM(dat
 
 if [ "$EXPECTED_SIZE" == "NULL" ]; then
   IGNORE_BACKUP="1"
-else
   echo -e "\e[32mNo local backup of\e[0m $DESTINATION_DB \e[32mdue to no data.\e[0m"
-fi
-
-if [ -z "$IGNORE_BACKUP" ]; then
-  read -r -p $'Do you want to backup local database? [\e[32mY\e[0m/n] ' response
-
-  if [[ ! $response =~ ^(yes|y)$ ]]; then
-    echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
-  else
-    echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
-    IGNORE_BACKUP=1
-  fi
-
+echo ""
+else
   echo "";
+
+  if [ -z "$IGNORE_BACKUP" ]; then
+    read -r -p $'Do you want to backup local database? [\e[32mY\e[0m/n] ' response
+
+    if [[ $response =~ ^(yes|y)$ ]]; then
+      echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
+    else
+      echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
+      IGNORE_BACKUP=1
+    fi
+
+    echo "";
+  fi
 fi
 
 read -r -p $'Do you want to continue? [\e[32mY\e[0m/n] ' response
@@ -108,18 +117,21 @@ if [[ ! $response =~ ^(yes|y)$ ]]; then
     fi
 
     echo -e "\e[32mStarting remote backup of\e[0m $SOURCE_DATABASE"
+    echo "";
+
     REMOTE_SQL_ZIP=$(ssh ${SOURCE_HOST} ${BACKUP_BIN_PATH} ${SOURCE_DATABASE})
 
     if [[ ! -z "${REMOTE_SQL_ZIP// }" ]]; then
       echo -e "\e[32mDownloading\e[0m $REMOTE_SQL_ZIP"
+      echo "";
 
       mkdir -p "./backups/latest"
       #REMOTE_SQL_ZIP_SIZE=$(ssh ${SOURCE_HOST} 'stat --printf="%s" /srv/mysql-util/${REMOTE_SQL_ZIP}')
 
       LOCAL_SQL_ZIP="./backups/latest/${SOURCE_DB}.sql.zip}"
-      REMOTE_SQL_FILE=${REMOTE_SQL_ZIP/.\/backups\/saved\//}
+      REMOTE_SQL_FILE=${REMOTE_SQL_ZIP/.\/backups\/latest\//}
       REMOTE_SQL_FILE=${REMOTE_SQL_FILE%.*}
-      LOCAL_SQL_FILE="./backups/saved/${REMOTE_SQL_FILE}"
+      LOCAL_SQL_FILE="${REMOTE_SQL_FILE}"
 
       rsync -r --progress ${SOURCE_HOST}:${REMOTE_SQL_ZIP} ${LOCAL_SQL_ZIP}
 
@@ -130,6 +142,7 @@ if [[ ! $response =~ ^(yes|y)$ ]]; then
 
         # Push the source onto the destination
         #if [ "${REMOTE_SQL_ZIP_SIZE}" == "${LOCAL_SQL_ZIP_SIZE}" ]; then
+          echo "";
           unzip -qq -o ${LOCAL_SQL_ZIP}
           echo -e "\e[32mRestoring backup\e[0m $SOURCE_DATABASE \e[32minto\e[0m ${DESTINATION_DB}"
           mysql --login-path=${DESTINATION_DB} -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
@@ -138,13 +151,17 @@ if [[ ! $response =~ ^(yes|y)$ ]]; then
 
           # Remove final restore file that we have used
           unlink ${LOCAL_SQL_ZIP}
-          unlink ${LOCAL_SQL_FILE}
         #fi
       fi
 
       ssh ${SOURCE_HOST} unlink ${REMOTE_SQL_ZIP}
+
       echo -e "\e[32mDone.\e[0m"
     fi
 fi
 
-exit 0;
+# Final.
+echo ""
+echo " --- press ENTER to close --- "
+read var
+cleanup
