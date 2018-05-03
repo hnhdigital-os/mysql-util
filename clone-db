@@ -121,12 +121,16 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
     # Backup destination
     mkdir -p "./backups/saved"
     chown -R ubuntu:ubuntu "./backups" 
-    mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+    echo -e "\e[32mStarting local backup of\e[0m $DESTINATION_DB"
+
+    mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB  | pv --progress --size "${EXPECTED_SIZE}m" > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+
     # Remove definer that can not be used in RDS
     perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
-    unlink ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
-    zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
-    unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql
+    unlink "./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql" > /dev/null 2>&1
+
+    zip -qq "./backups/saved/${DESTINATION_DB}_$DATE.zip" "./backups/saved/${DESTINATION_DB}_$DATE.sql"
+    unlink "./backups/saved/${DESTINATION_DB}_$DATE.sql" > /dev/null 2>&1
   fi
 
   mkdir -p "./backups/current"
