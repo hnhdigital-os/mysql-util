@@ -1,6 +1,14 @@
 #!/bin/bash
 # clone-db: Clone a database into another database.
 
+cleanup() {
+    echo "";
+    echo "";
+    exit
+}
+
+trap cleanup INT TERM
+
 command -v mysql >/dev/null 2>&1 || { echo "I require mysql but it's not installed.  Aborting." >&2; exit 1; }
 command -v mysqldump >/dev/null 2>&1 || { echo "I require mysqldump but it's not installed.  Aborting." >&2; exit 1; }
 command -v zip >/dev/null 2>&1 || { echo "I require zip but it's not installed.  Aborting." >&2; exit 1; }
@@ -21,6 +29,16 @@ if [ -z "$1" ] || [ -z "$2" ]; then
   echo -e "\tdestination\t- The destination database (from list)";
   echo -e "\tno backup\t- optionally set this to 1 to not backup the destination database";
   echo "";
+  echo -e "\tAvailable remote databases:";
+
+  for i in ${AVAILABLE_DB[@]}; do
+    echo -e "\t- ${i}";
+  done
+  echo "";
+  echo -e "\tAvailable destination databases:";
+
+  mysql_config_editor print --all
+  echo "";
   exit 1;
 fi
 
@@ -32,6 +50,7 @@ fi
 
 SOURCE_DB=$1
 DESTINATION_DB=$2
+IGNORE_BACKUP=$3
 
 MYSQL_CMD="mysql --login-path=$SOURCE_DB -e \";\""
 
@@ -52,6 +71,34 @@ fi
 DATE=`date +%Y%m%d_%H%M%S`
 
 echo "";
+echo -e "\e[32mRemote DB:\e[0m $SOURCE_DB"
+echo -e "\e[32m Local DB:\e[0m $DESTINATION_DB";
+echo "";
+
+EXPECTED_SIZE=$(mysql --login-path=${DESTINATION_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${DESTINATION_DB}\";")
+
+if [ "$EXPECTED_SIZE" == "NULL" ]; then
+  IGNORE_BACKUP="1"
+  echo -e "\e[32mNo local backup of\e[0m $DESTINATION_DB \e[32mdue to no data.\e[0m"
+echo ""
+else
+  echo "";
+
+  if [ -z "$IGNORE_BACKUP" ]; then
+    read -r -p $'Do you want to backup local database? [y/\e[32mN\e[0m] ' response
+
+    if [[ $response =~ ^(yes|y)$ ]]; then
+      echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
+    else
+      echo -e "\e[41mWARNING: '$DESTINATION_DB' will not be backed up!\e[0m"
+      IGNORE_BACKUP=1
+    fi
+
+    echo "";
+  fi
+fi
+
+echo "";
 echo "This will clone all data from '$SOURCE_DB' into '$DESTINATION_DB'";
 echo "";
 if [ "$3" ]; then
@@ -60,41 +107,50 @@ else
     echo "NOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'"
 fi
 echo "";
-read -r -p "Do you want to continue? [y/N] " response
+
+read -r -p $'Do you want to continue? [\e[32mY\e[0m/n] ' response
+echo "";
+
 response=${response,,}    # tolower
-if [[ $response =~ ^(yes|y)$ ]]; then
 
-    # pull the database configuration
+if [[ ! $response =~ ^(no|n)$ ]]; then
 
-    if [ -z "$3" ]; then
-        # Backup destination
-        mkdir -p "./backups/saved"
-        chown -R ubuntu:ubuntu "./backups" 
-        mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
-        # Remove definer that can not be used in RDS
-        perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
-        unlink ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
-        zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
-        unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql
-    fi
+  # pull the database configuration
 
-    mkdir -p "./backups/current"
-
-    # Pull the source down
-    mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --add-drop-table $SOURCE_DB > backups/current/TEMP_$SOURCE_DB.sql
-
+  if [ -z "$3" ]; then
+    # Backup destination
+    mkdir -p "./backups/saved"
+    chown -R ubuntu:ubuntu "./backups" 
+    mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
     # Remove definer that can not be used in RDS
-    perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
-    unlink ./backups/current/TEMP_$SOURCE_DB.sql
+    perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
+    unlink ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+    zip ./backups/saved/${DESTINATION_DB}_$DATE.zip ./backups/saved/${DESTINATION_DB}_$DATE.sql
+    unlink ./backups/saved/${DESTINATION_DB}_$DATE.sql
+  fi
 
-    # Push the source onto the destination
-    mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
-    mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
-    mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < backups/current/$SOURCE_DB.sql
+  mkdir -p "./backups/current"
 
-    # Remove final restore file that we have used
-    unlink ./backups/current/$SOURCE_DB.sql
-        
+  # Pull the source down
+  mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --add-drop-table $SOURCE_DB > backups/current/TEMP_$SOURCE_DB.sql
+
+  # Remove definer that can not be used in RDS
+  perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
+  unlink ./backups/current/TEMP_$SOURCE_DB.sql
+
+  # Push the source onto the destination
+  mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
+  mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
+  mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < backups/current/$SOURCE_DB.sql
+
+  # Remove final restore file that we have used
+  unlink ./backups/current/$SOURCE_DB.sql
+
+  echo -e "\e[32mDone.\e[0m"
 fi
 
-exit 0;
+# Final.
+echo ""
+echo " --- press ENTER to close --- "
+read var
+cleanup

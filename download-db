@@ -84,7 +84,7 @@ else
   echo "";
 
   if [ -z "$IGNORE_BACKUP" ]; then
-    read -r -p $'Do you want to backup local database? [\e[32mY\e[0m/n] ' response
+    read -r -p $'Do you want to backup local database? [y/\e[32mN\e[0m] ' response
 
     if [[ $response =~ ^(yes|y)$ ]]; then
       echo -e "\e[45mNOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'\e[0m"
