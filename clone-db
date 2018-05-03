@@ -71,8 +71,8 @@ fi
 DATE=`date +%Y%m%d_%H%M%S`
 
 echo "";
-echo -e "\e[32mRemote DB:\e[0m $SOURCE_DB"
-echo -e "\e[32m Local DB:\e[0m $DESTINATION_DB";
+echo -e "\e[32m     Source DB:\e[0m $SOURCE_DB"
+echo -e "\e[32mDestination DB:\e[0m $DESTINATION_DB";
 echo "";
 
 # How big is the destination db?
