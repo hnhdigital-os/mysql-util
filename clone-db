@@ -114,7 +114,7 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
     chown -R ubuntu:ubuntu "./backups" 
     echo -e "\e[32mStarting local backup of\e[0m $DESTINATION_DB"
 
-    mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB  | pv --progress --size "${DESTINATION_EXPECTED_SIZE}m" > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+    mysqldump --login-path=$DESTINATION_DB --compress --complete-insert --disable-keys --quick --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB  | pv --progress --size "${DESTINATION_EXPECTED_SIZE}m" > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
 
     # Remove definer that can not be used in RDS
     perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
@@ -132,7 +132,7 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
   # Pull the source down
   echo "";
   echo -e "\e[32mStarting source sql dump of\e[0m ${SOURCE_DB}"
-  mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --add-drop-table $SOURCE_DB | pv --progress --size "${SOURCE_EXPECTED_SIZE}m"  > backups/current/TEMP_$SOURCE_DB.sql
+  mysqldump --login-path=$SOURCE_DB --compress --complete-insert --disable-keys --quick --single-transaction --add-drop-table $SOURCE_DB | pv --progress --size "${SOURCE_EXPECTED_SIZE}m"  > backups/current/TEMP_$SOURCE_DB.sql
 
   # Remove definer that can not be used in RDS
   perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
@@ -140,7 +140,7 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
 
   # Push the source onto the destination
   echo "";
-  echo -e "\e[32mSImporting sql dump into \e[0m ${DESTINATION_DB}"
+  echo -e "\e[32mImporting sql dump into \e[0m ${DESTINATION_DB}"
   mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
   mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
   pv backups/current/$SOURCE_DB.sql | mysql --login-path=${DESTINATION_DB} --database=${DESTINATION_DB}
