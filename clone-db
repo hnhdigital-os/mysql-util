@@ -130,6 +130,8 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
   SOURCE_EXPECTED_SIZE=$(mysql --login-path=${SOURCE_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${SOURCE_DB}\";")
 
   # Pull the source down
+  echo "";
+  echo -e "\e[32mStarting source sql dump of\e[0m ${SOURCE_DB}"
   mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --skip-extended-insert --add-drop-table $SOURCE_DB | pv --progress --size "${SOURCE_EXPECTED_SIZE}m"  > backups/current/TEMP_$SOURCE_DB.sql
 
   # Remove definer that can not be used in RDS
@@ -137,9 +139,11 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
   unlink ./backups/current/TEMP_$SOURCE_DB.sql
 
   # Push the source onto the destination
+  echo "";
+  echo -e "\e[32mSImporting sql dump into \e[0m ${DESTINATION_DB}"
   mysql --login-path=$DESTINATION_DB -e "DROP DATABASE IF EXISTS ${DESTINATION_DB}"
   mysql --login-path=$DESTINATION_DB -e "CREATE DATABASE ${DESTINATION_DB} DEFAULT CHARACTER SET utf8mb4"
-  mysql --login-path=$DESTINATION_DB --database=$DESTINATION_DB < backups/current/$SOURCE_DB.sql
+  pv backups/current/$SOURCE_DB.sql | mysql --login-path=${DESTINATION_DB} --database=${DESTINATION_DB}
 
   # Remove final restore file that we have used
   unlink ./backups/current/$SOURCE_DB.sql
