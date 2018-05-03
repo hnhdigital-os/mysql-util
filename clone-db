@@ -132,7 +132,7 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
   # Pull the source down
   echo "";
   echo -e "\e[32mStarting source sql dump of\e[0m ${SOURCE_DB}"
-  mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --skip-extended-insert --add-drop-table $SOURCE_DB | pv --progress --size "${SOURCE_EXPECTED_SIZE}m"  > backups/current/TEMP_$SOURCE_DB.sql
+  mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --add-drop-table $SOURCE_DB | pv --progress --size "${SOURCE_EXPECTED_SIZE}m"  > backups/current/TEMP_$SOURCE_DB.sql
 
   # Remove definer that can not be used in RDS
   perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
