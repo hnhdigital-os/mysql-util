@@ -36,7 +36,7 @@ DATE=`date +%Y%m%d_%H%M%S`
 
 # Backup destination
 mkdir -p "./backups/saved"
-mysqldump --login-path=$SOURCE_DB --skip-extended-insert --add-drop-table $SOURCE_DB > "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql"
+mysqldump --login-path=$SOURCE_DB --compress --complete-insert --disable-keys --quick --single-transaction --add-drop-table --add-drop-table $SOURCE_DB > "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql"
 perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql" > "./backups/saved/${SOURCE_DB}_$DATE.sql"
 unlink "./backups/saved/TEMP_${SOURCE_DB}_$DATE.sql" > /dev/null 2>&1
 

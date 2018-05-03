@@ -110,7 +110,7 @@ if [[ ! $response =~ ^(yes|y)$ ]]; then
         # Backup destination
         mkdir -p "./backups/saved"
         echo -e "\e[32mStarting local backup of\e[0m $DESTINATION_DB"
-        mysqldump --login-path=${DESTINATION_DB} --add-drop-table ${DESTINATION_DB} | pv --progress --size "${EXPECTED_SIZE}m" > "./backups/saved/${DESTINATION_DB}_$DATE.sql"
+        mysqldump --login-path=${DESTINATION_DB} --compress --complete-insert --disable-keys --quick --single-transaction --add-drop-table ${DESTINATION_DB} | pv --progress --size "${EXPECTED_SIZE}m" > "./backups/saved/${DESTINATION_DB}_$DATE.sql"
         zip -qq "./backups/saved/${DESTINATION_DB}_$DATE.sql.zip" "./backups/saved/${DESTINATION_DB}_$DATE.sql"
         unlink "./backups/saved/${DESTINATION_DB}_$DATE.sql" > /dev/null 2>&1
       
