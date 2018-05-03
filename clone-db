@@ -75,9 +75,10 @@ echo -e "\e[32mRemote DB:\e[0m $SOURCE_DB"
 echo -e "\e[32m Local DB:\e[0m $DESTINATION_DB";
 echo "";
 
-EXPECTED_SIZE=$(mysql --login-path=${DESTINATION_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${DESTINATION_DB}\";")
+# How big is the destination db?
+DESTINATION_EXPECTED_SIZE=$(mysql --login-path=${DESTINATION_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${DESTINATION_DB}\";")
 
-if [ "$EXPECTED_SIZE" == "NULL" ]; then
+if [ "$DESTINATION_EXPECTED_SIZE" == "NULL" ]; then
   IGNORE_BACKUP="1"
   echo -e "\e[32mNo local backup of\e[0m $DESTINATION_DB \e[32mdue to no data.\e[0m"
 echo ""
@@ -113,7 +114,7 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
     chown -R ubuntu:ubuntu "./backups" 
     echo -e "\e[32mStarting local backup of\e[0m $DESTINATION_DB"
 
-    mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB  | pv --progress --size "${EXPECTED_SIZE}m" > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
+    mysqldump --login-path=$DESTINATION_DB -CceKq --single-transaction --add-drop-table --add-drop-database --databases $DESTINATION_DB  | pv --progress --size "${DESTINATION_EXPECTED_SIZE}m" > backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql
 
     # Remove definer that can not be used in RDS
     perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/saved/TEMP_${DESTINATION_DB}_$DATE.sql > ./backups/saved/${DESTINATION_DB}_$DATE.sql
@@ -125,8 +126,11 @@ if [[ ! $response =~ ^(no|n)$ ]]; then
 
   mkdir -p "./backups/current"
 
+  # How big is the source db?
+  SOURCE_EXPECTED_SIZE=$(mysql --login-path=${SOURCE_DB} -N -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 0) AS \"Size (MB)\" FROM information_schema.TABLES WHERE table_schema=\"${SOURCE_DB}\";")
+
   # Pull the source down
-  mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --add-drop-table $SOURCE_DB > backups/current/TEMP_$SOURCE_DB.sql
+  mysqldump --login-path=$SOURCE_DB -CceKq --single-transaction --skip-extended-insert --add-drop-table $SOURCE_DB | pv --progress --size "${SOURCE_EXPECTED_SIZE}m"  > backups/current/TEMP_$SOURCE_DB.sql
 
   # Remove definer that can not be used in RDS
   perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' < ./backups/current/TEMP_$SOURCE_DB.sql > ./backups/current/$SOURCE_DB.sql
