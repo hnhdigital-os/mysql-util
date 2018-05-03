@@ -98,16 +98,6 @@ else
   fi
 fi
 
-echo "";
-echo "This will clone all data from '$SOURCE_DB' into '$DESTINATION_DB'";
-echo "";
-if [ "$3" ]; then
-    echo "WARNING: '$DESTINATION_DB' will not be backed up!"
-else
-    echo "NOTE: '$DESTINATION_DB' will be backed up to 'backups/saved/${DESTINATION_DB}_$DATE.sql'"
-fi
-echo "";
-
 read -r -p $'Do you want to continue? [\e[32mY\e[0m/n] ' response
 echo "";
 
